@@ -120,7 +120,7 @@ export const defaultTemplates: ObjectTemplate[] = [
 export const defaultRegion: RegionConfig = {
   width: 1000,
   height: 1000,
-  tileSize: 25,
+  tileSize: 64,
   showGrid: true,
   globalCullingFactor: 1,
 }

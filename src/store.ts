@@ -40,6 +40,8 @@ interface AppStore extends ProjectState {
   selectedTemplateType: ObjectType
   heatmapEnabled: boolean
   heatmapMetric: 'dp' | 'triangles'
+  heatmapOpacity: number
+  heatmapLowFade: number
   compareVersionIds: string[]
   importError: string | null
   setProject: (project: ProjectState) => void
@@ -61,6 +63,8 @@ interface AppStore extends ProjectState {
   updateQualityConfig: (platform: Platform, level: number, patch: Partial<QualityConfigs[Platform][number]>) => void
   toggleHeatmap: () => void
   setHeatmapMetric: (metric: 'dp' | 'triangles') => void
+  setHeatmapOpacity: (opacity: number) => void
+  setHeatmapLowFade: (threshold: number) => void
   saveVersion: (name: string) => void
   setCompareVersionIds: (ids: string[]) => void
   importTemplates: (templates: ObjectTemplate[]) => void
@@ -77,6 +81,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   selectedTemplateType: 'tree',
   heatmapEnabled: false,
   heatmapMetric: 'dp',
+  heatmapOpacity: 0.5,
+  heatmapLowFade: 0.25,
   compareVersionIds: [],
   importError: null,
   setProject: (project) =>
@@ -236,6 +242,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
   toggleHeatmap: () => set((state) => ({ heatmapEnabled: !state.heatmapEnabled })),
   setHeatmapMetric: (heatmapMetric) => set({ heatmapMetric }),
+  setHeatmapOpacity: (heatmapOpacity) => set({ heatmapOpacity: clamp(heatmapOpacity, 0.05, 1) }),
+  setHeatmapLowFade: (heatmapLowFade) => set({ heatmapLowFade: clamp(heatmapLowFade, 0, 0.6) }),
   saveVersion: (name) =>
     set((state) => ({
       versions: [

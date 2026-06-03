@@ -169,10 +169,8 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
 
   const state = useAppStore()
   const selectedPoi = state.pois.find((poi) => poi.id === state.selectedPoiId) ?? null
-  const heatSamples = useMemo(
-    () => (state.heatmapEnabled ? buildHeatSamples(state, state.heatmapMetric, 100) : []),
-    [state],
-  )
+  const heatSamples = useMemo(() => (state.heatmapEnabled ? buildHeatSamples(state) : []), [state])
+  const heatBudget = state.heatmapMetric === 'dp' ? result.dpBudget : result.triangleBudget
   const view = useMemo(() => {
     const padding = 56
     const baseZoom = Math.min(
@@ -231,8 +229,8 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
     ctx.lineWidth = 1 / view.zoom
     ctx.strokeRect(0, 0, state.regionConfig.width, state.regionConfig.height)
 
-    if (state.regionConfig.showGrid) {
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.7)'
+    const drawGrid = (alpha = 0.7) => {
+      ctx.strokeStyle = `rgba(148, 163, 184, ${alpha})`
       ctx.lineWidth = 1 / view.zoom
       for (let x = 0; x <= state.regionConfig.width; x += state.regionConfig.tileSize) {
         ctx.beginPath()
@@ -249,14 +247,67 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
     }
 
     if (state.heatmapEnabled && heatSamples.length) {
-      const max = Math.max(...heatSamples.map((sample) => sample.value), 1)
+      const heatColor = (value: number) => {
+        const ratio = clamp(value / Math.max(1, heatBudget), 0, 1.4)
+        const normalized = clamp(ratio, 0, 1)
+        const fadeThreshold = Math.max(0.01, state.heatmapLowFade)
+        const fadeRatio = clamp(normalized / fadeThreshold, 0, 1)
+        const baseAlpha =
+          normalized <= fadeThreshold
+            ? 0.02 + Math.pow(fadeRatio, 1.8) * 0.1
+            : 0.14 + normalized * 0.5
+        const alpha = clamp(baseAlpha * state.heatmapOpacity, 0, 0.78)
+        if (ratio < 0.45) return `rgba(34, 197, 94, ${alpha})`
+        if (ratio < 0.7) return `rgba(234, 179, 8, ${alpha})`
+        if (ratio < 1) return `rgba(249, 115, 22, ${alpha})`
+        return `rgba(239, 68, 68, ${Math.min(0.86, alpha + 0.08)})`
+      }
       heatSamples.forEach((sample) => {
-        const ratio = sample.value / max
-        ctx.fillStyle = `rgba(${Math.round(40 + 215 * ratio)}, ${Math.round(180 - 120 * ratio)}, ${Math.round(255 - 230 * ratio)}, ${0.09 + ratio * 0.36})`
+        const width = Math.min(sample.size, state.regionConfig.width - sample.x)
+        const height = Math.min(sample.size, state.regionConfig.height - sample.y)
+        const cx = sample.x + width / 2
+        const cy = sample.y + height / 2
+        const valueOf = (metric: typeof sample.up) => state.heatmapMetric === 'dp' ? metric.dp : metric.triangles
+
+        ctx.fillStyle = heatColor(valueOf(sample.up))
         ctx.beginPath()
-        ctx.arc(sample.x, sample.y, 78, 0, Math.PI * 2)
+        ctx.moveTo(sample.x, sample.y)
+        ctx.lineTo(sample.x + width, sample.y)
+        ctx.lineTo(cx, cy)
+        ctx.closePath()
         ctx.fill()
+
+        ctx.fillStyle = heatColor(valueOf(sample.right))
+        ctx.beginPath()
+        ctx.moveTo(sample.x + width, sample.y)
+        ctx.lineTo(sample.x + width, sample.y + height)
+        ctx.lineTo(cx, cy)
+        ctx.closePath()
+        ctx.fill()
+
+        ctx.fillStyle = heatColor(valueOf(sample.down))
+        ctx.beginPath()
+        ctx.moveTo(sample.x + width, sample.y + height)
+        ctx.lineTo(sample.x, sample.y + height)
+        ctx.lineTo(cx, cy)
+        ctx.closePath()
+        ctx.fill()
+
+        ctx.fillStyle = heatColor(valueOf(sample.left))
+        ctx.beginPath()
+        ctx.moveTo(sample.x, sample.y + height)
+        ctx.lineTo(sample.x, sample.y)
+        ctx.lineTo(cx, cy)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.18)'
+        ctx.lineWidth = 0.5 / view.zoom
+        ctx.strokeRect(sample.x, sample.y, width, height)
       })
+    }
+
+    if (state.regionConfig.showGrid) {
+      drawGrid(state.heatmapEnabled ? 0.9 : 0.7)
     }
 
     const cam = state.camera
@@ -323,7 +374,7 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
     ctx.fillStyle = '#94a3b8'
     ctx.font = '12px Fira Code, monospace'
     ctx.fillText(`X ${Math.round(pointer.x)} / Y ${Math.round(pointer.y)} / Zoom ${Math.round(view.zoom * 100)}%`, 16, rect.height - 16)
-  }, [state, view, pointer, result, heatSamples, canvasSize])
+  }, [state, view, pointer, result, heatSamples, heatBudget, canvasSize])
 
   const hitPoi = (x: number, y: number) =>
     [...state.pois].reverse().find((poi) => x >= poi.x && x <= poi.x + poi.width && y >= poi.y && y <= poi.y + poi.height)
@@ -446,10 +497,52 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
           <strong>{Math.round(state.camera.heading)}°</strong>
         </div>
       </div>
+      {state.heatmapEnabled && (
+        <div className="heatmap-controls">
+          <label>
+            <span>热力透明</span>
+            <input
+              aria-label="热力图透明度"
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={state.heatmapOpacity}
+              onChange={(event) => state.setHeatmapOpacity(Number(event.target.value))}
+            />
+            <strong>{Math.round(state.heatmapOpacity * 100)}%</strong>
+          </label>
+          <label>
+            <span>低负载淡化</span>
+            <input
+              aria-label="低负载淡化阈值"
+              type="range"
+              min={0}
+              max={0.6}
+              step={0.05}
+              value={state.heatmapLowFade}
+              onChange={(event) => state.setHeatmapLowFade(Number(event.target.value))}
+            />
+            <strong>{Math.round(state.heatmapLowFade * 100)}%</strong>
+          </label>
+        </div>
+      )}
       {selectedPoi && (
         <div className="floating-poi">
           <strong>{selectedPoi.name}</strong>
           <span>{selectedPoi.level} / {Math.round(selectedPoi.width)}m × {Math.round(selectedPoi.height)}m</span>
+        </div>
+      )}
+      {state.heatmapEnabled && (
+        <div className="heatmap-legend">
+          <strong>{state.heatmapMetric === 'dp' ? 'DP' : 'Triangles'} 四向采样</strong>
+          <span>上/右/下/左分别代表地块中心朝对应方向的采样结果</span>
+          <div>
+            <i className="low" />低
+            <i className="mid" />中
+            <i className="high" />高
+            <i className="critical" />峰值
+          </div>
         </div>
       )}
     </div>
@@ -597,7 +690,7 @@ function ConfigPanel() {
       <div className="grid-two">
         <NumberField label="宽度 m" value={state.regionConfig.width} min={100} max={2000} onChange={(value) => state.updateRegion({ width: value })} />
         <NumberField label="高度 m" value={state.regionConfig.height} min={100} max={2000} onChange={(value) => state.updateRegion({ height: value })} />
-        <SelectField label="地块" value={String(state.regionConfig.tileSize)} options={[10, 25, 50, 100].map((size) => ({ value: String(size), label: `${size}m` }))} onChange={(value) => state.updateRegion({ tileSize: Number(value) as 10 | 25 | 50 | 100 })} />
+        <NumberField label="地块 m" value={state.regionConfig.tileSize} min={16} max={256} onChange={(value) => state.updateRegion({ tileSize: value })} />
         <NumberField label="全局剔除系数" value={state.regionConfig.globalCullingFactor} min={0} max={2} step={0.05} onChange={(value) => state.updateRegion({ globalCullingFactor: value })} />
       </div>
       <div className="segmented six">

@@ -215,30 +215,40 @@ export const calculatePointDensity = (
   x: number,
   y: number,
   state: ProjectState,
-  metric: 'dp' | 'triangles',
+  heading = state.camera.heading,
 ) => {
   const pseudoCamera: CameraConfig = {
     ...state.camera,
     x,
     y,
-    fov: 360,
-    viewDistance: 220,
-    far: 220,
+    heading,
   }
   const sampleState = { ...state, camera: pseudoCamera }
-  const perf = calculatePerformance(sampleState)
-  return metric === 'dp' ? perf.totalDp : perf.totalTriangles
+  return calculatePerformance(sampleState)
 }
 
-export const buildHeatSamples = (
-  state: ProjectState,
-  metric: 'dp' | 'triangles',
-  step = 100,
-): HeatSample[] => {
+export const buildHeatSamples = (state: ProjectState): HeatSample[] => {
   const samples: HeatSample[] = []
-  for (let y = step / 2; y < state.regionConfig.height; y += step) {
-    for (let x = step / 2; x < state.regionConfig.width; x += step) {
-      samples.push({ x, y, value: calculatePointDensity(x, y, state, metric) })
+  const step = clamp(state.regionConfig.tileSize, 16, 256)
+  for (let y = 0; y < state.regionConfig.height; y += step) {
+    for (let x = 0; x < state.regionConfig.width; x += step) {
+      const width = Math.min(step, state.regionConfig.width - x)
+      const height = Math.min(step, state.regionConfig.height - y)
+      const cx = x + width / 2
+      const cy = y + height / 2
+      const up = calculatePointDensity(cx, cy, state, -90)
+      const right = calculatePointDensity(cx, cy, state, 0)
+      const down = calculatePointDensity(cx, cy, state, 90)
+      const left = calculatePointDensity(cx, cy, state, 180)
+      samples.push({
+        x,
+        y,
+        size: step,
+        up: { dp: up.totalDp, triangles: up.totalTriangles },
+        right: { dp: right.totalDp, triangles: right.totalTriangles },
+        down: { dp: down.totalDp, triangles: down.totalTriangles },
+        left: { dp: left.totalDp, triangles: left.totalTriangles },
+      })
     }
   }
   return samples
@@ -248,4 +258,5 @@ export const clampRegion = (region: RegionConfig): RegionConfig => ({
   ...region,
   width: clamp(Math.round(region.width), 100, 2000),
   height: clamp(Math.round(region.height), 100, 2000),
+  tileSize: clamp(Math.round(region.tileSize), 16, 256),
 })

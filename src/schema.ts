@@ -65,7 +65,7 @@ const cameraSchema = z.object({
 const regionSchema = z.object({
   width: z.number().min(100).max(2000),
   height: z.number().min(100).max(2000),
-  tileSize: z.union([z.literal(10), z.literal(25), z.literal(50), z.literal(100)]),
+  tileSize: z.number().min(16).max(256),
   showGrid: z.boolean(),
   globalCullingFactor: z.number().min(0).max(2),
 })

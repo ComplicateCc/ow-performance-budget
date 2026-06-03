@@ -6,7 +6,7 @@ export type BudgetStatus = 'safe' | 'warning' | 'critical'
 export interface RegionConfig {
   width: number
   height: number
-  tileSize: 10 | 25 | 50 | 100
+  tileSize: number
   showGrid: boolean
   globalCullingFactor: number
 }
@@ -129,5 +129,9 @@ export interface ProjectState {
 export interface HeatSample {
   x: number
   y: number
-  value: number
+  size: number
+  up: MetricBudget
+  right: MetricBudget
+  down: MetricBudget
+  left: MetricBudget
 }
