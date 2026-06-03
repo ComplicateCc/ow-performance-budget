@@ -80,7 +80,7 @@ textarea:focus-visible {
 .workspace {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 330px) minmax(360px, 1fr) minmax(300px, 370px);
+  grid-template-columns: 360px 6px minmax(360px, 1fr) minmax(300px, 370px);
 }
 
 .side-panel {
@@ -92,11 +92,41 @@ textarea:focus-visible {
 }
 
 .left-panel {
-  border-right: 1px solid #1e293b;
+  border-right: 0;
 }
 
 .right-panel {
   border-left: 1px solid #1e293b;
+}
+
+.left-resizer {
+  position: relative;
+  min-width: 6px;
+  cursor: col-resize;
+  background: #07111f;
+  border-inline: 1px solid #1e293b;
+}
+
+.left-resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 44px;
+  border-radius: 999px;
+  background: #334155;
+  transform: translate(-50%, -50%);
+}
+
+.left-resizer:hover::after,
+.is-resizing-panel .left-resizer::after {
+  background: #38bdf8;
+}
+
+.is-resizing-panel {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .panel-section {
@@ -310,7 +340,8 @@ button.danger {
   margin-top: 10px;
   border: 1px solid #1e293b;
   border-radius: 6px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .lod-head,
@@ -324,6 +355,7 @@ button.danger {
 .lod-head.budget-head,
 .lod-row.budget-row {
   grid-template-columns: 52px 1fr 1fr 1fr 1fr 1fr;
+  min-width: 620px;
 }
 
 .lod-head {
@@ -629,7 +661,7 @@ button.danger {
 
 @media (max-width: 1200px) {
   .workspace {
-    grid-template-columns: 290px minmax(320px, 1fr) 320px;
+    grid-template-columns: 330px 6px minmax(320px, 1fr) 320px;
   }
 
   .object-counts {
@@ -651,6 +683,10 @@ button.danger {
   .top-bar,
   .workspace {
     display: block;
+  }
+
+  .left-resizer {
+    display: none;
   }
 
   .side-panel {

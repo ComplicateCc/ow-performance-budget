@@ -87,6 +87,7 @@ export interface PoiStat {
   dp: number
   triangles: number
   visible: boolean
+  overlapRatio: number
 }
 
 export interface PerformanceResult {

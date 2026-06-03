@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest'
 import {
+  calculatePoiFrustumOverlap,
   calculatePerformance,
   getBudgetStatus,
   getQuality,
@@ -103,6 +104,38 @@ describe('performance calculation', () => {
     expect(getBudgetStatus(0.2, 0.4)).toBe('safe')
     expect(getBudgetStatus(0.7, 0.4)).toBe('warning')
     expect(getBudgetStatus(0.2, 0.9)).toBe('critical')
+  })
+
+  it('scales POI contribution by frustum overlap', () => {
+    const full = createDefaultProject()
+    full.pois = [
+      {
+        id: 'target',
+        name: 'Target',
+        description: '',
+        level: 'M',
+        x: 460,
+        y: 420,
+        width: 120,
+        height: 120,
+        cullingRate: 0,
+        objects: { meadow: 0, tree: 40, building: 0, prop: 0, effect: 0 },
+      },
+    ]
+    full.camera = { x: 520, y: 720, heading: -90, fov: 100, viewDistance: 500, near: 1, far: 600 }
+
+    const partial = createDefaultProject()
+    partial.pois = full.pois
+    partial.camera = { ...full.camera, fov: 16 }
+
+    const fullOverlap = calculatePoiFrustumOverlap(full.pois[0], full.camera)
+    const partialOverlap = calculatePoiFrustumOverlap(partial.pois[0], partial.camera)
+    const fullPerf = calculatePerformance(full).byPoi[0]
+    const partialPerf = calculatePerformance(partial).byPoi[0]
+
+    expect(fullOverlap.overlapRatio).toBeGreaterThan(partialOverlap.overlapRatio)
+    expect(partialOverlap.overlapRatio).toBeGreaterThan(0)
+    expect(partialPerf.dp).toBeLessThan(fullPerf.dp)
   })
 })
 

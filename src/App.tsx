@@ -748,6 +748,7 @@ function StatsPanel({ result }: { result: ReturnType<typeof calculatePerformance
             <button key={item.poiId} onClick={() => state.selectPoi(item.poiId)} className={item.visible ? '' : 'muted'}>
               <span>{item.name}</span>
               <strong>{fmt(item.dp)} / {fmt(item.triangles)}</strong>
+              <small>视锥重叠 {Math.round(item.overlapRatio * 100)}%</small>
             </button>
           ))}
         </div>
@@ -866,6 +867,8 @@ function StatusBar({ result }: { result: ReturnType<typeof calculatePerformance>
 function App() {
   const state = useAppStore()
   const result = useMemo(() => calculatePerformance(state), [state])
+  const [leftWidth, setLeftWidth] = useState(360)
+  const resizingLeftRef = useRef(false)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -886,6 +889,23 @@ function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [state])
 
+  useEffect(() => {
+    const handleMove = (event: PointerEvent) => {
+      if (!resizingLeftRef.current) return
+      setLeftWidth(clamp(event.clientX, 300, 620))
+    }
+    const handleUp = () => {
+      resizingLeftRef.current = false
+      document.body.classList.remove('is-resizing-panel')
+    }
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    return () => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+    }
+  }, [])
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -901,8 +921,20 @@ function App() {
           </select>
         </div>
       </header>
-      <main className="workspace">
+      <main
+        className="workspace"
+        style={{ gridTemplateColumns: `${leftWidth}px 6px minmax(360px, 1fr) minmax(300px, 370px)` }}
+      >
         <LeftPanel />
+        <div
+          className="left-resizer"
+          role="separator"
+          aria-label="调整左侧栏宽度"
+          onPointerDown={() => {
+            resizingLeftRef.current = true
+            document.body.classList.add('is-resizing-panel')
+          }}
+        />
         <MapCanvas result={result} />
         <StatsPanel result={result} />
       </main>

@@ -65,6 +65,44 @@ export const getTemplateForType = (templates: ObjectTemplate[], type: ObjectType
   return template
 }
 
+const buildPoiSamples = (poi: PoiRegion, targetSamples = 64) => {
+  const columns = Math.max(2, Math.round(Math.sqrt(targetSamples * (poi.width / Math.max(1, poi.height)))))
+  const rows = Math.max(2, Math.round(targetSamples / columns))
+  const samples: { x: number; y: number }[] = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      samples.push({
+        x: poi.x + ((column + 0.5) / columns) * poi.width,
+        y: poi.y + ((row + 0.5) / rows) * poi.height,
+      })
+    }
+  }
+  return samples
+}
+
+export const calculatePoiFrustumOverlap = (poi: PoiRegion, camera: CameraConfig) => {
+  const samples = buildPoiSamples(poi)
+  const visibleSamples = samples.filter((sample) => isPointInCamera(sample, camera))
+  return {
+    samples,
+    visibleSamples,
+    overlapRatio: visibleSamples.length / samples.length,
+  }
+}
+
+const getTemplatePercentAtDistance = (template: ObjectTemplate, rawDistance: number, lodScale: number) => {
+  const hasDisappearDistance = template.disappearDistance > 0
+  if (hasDisappearDistance && rawDistance > template.disappearDistance * lodScale) {
+    return null
+  }
+  const useHlod = !hasDisappearDistance && rawDistance >= template.hlodDistance * lodScale
+  const lod = pickLod(template, rawDistance, lodScale)
+  return {
+    dpPercent: useHlod ? template.hlodDpPercent : lod.dpPercent,
+    trianglePercent: useHlod ? template.hlodTrianglePercent : lod.trianglePercent,
+  }
+}
+
 export const calculatePoiContribution = (
   poi: PoiRegion,
   templates: ObjectTemplate[],
@@ -72,26 +110,29 @@ export const calculatePoiContribution = (
   camera: CameraConfig,
   globalCullingFactor: number,
 ) => {
-  const center = getPoiCenter(poi)
-  const dist = distance(center, camera)
   const culling = clamp((poi.cullingRate / 100) * globalCullingFactor, 0, 1)
   const result: CategoryStat[] = []
+  const { samples, visibleSamples } = calculatePoiFrustumOverlap(poi, camera)
+  if (visibleSamples.length === 0) return result
 
   ;(Object.keys(poi.objects) as ObjectType[]).forEach((type) => {
     const count = poi.objects[type]
     if (!count) return
     const template = poi.templateOverrides?.[type] ?? getTemplateForType(templates, type)
-    const hasDisappearDistance = template.disappearDistance > 0
-    if (hasDisappearDistance && dist > template.disappearDistance * quality.lodScale) return
-    const useHlod = !hasDisappearDistance && dist >= template.hlodDistance * quality.lodScale
-    const lod = pickLod(template, dist, quality.lodScale)
-    const dpPercent = useHlod ? template.hlodDpPercent : lod.dpPercent
-    const triPercent = useHlod ? template.hlodTrianglePercent : lod.trianglePercent
+    let weightedDpPercent = 0
+    let weightedTrianglePercent = 0
+    visibleSamples.forEach((sample) => {
+      const percent = getTemplatePercentAtDistance(template, distance(sample, camera), quality.lodScale)
+      if (!percent) return
+      weightedDpPercent += percent.dpPercent / samples.length
+      weightedTrianglePercent += percent.trianglePercent / samples.length
+    })
+    if (weightedDpPercent <= 0 && weightedTrianglePercent <= 0) return
     result.push({
       type,
-      count,
-      dp: count * template.baseDp * (dpPercent / 100) * (1 - culling),
-      triangles: count * template.baseTriangles * (triPercent / 100) * (1 - culling),
+      count: count * (visibleSamples.length / samples.length),
+      dp: count * template.baseDp * (weightedDpPercent / 100) * (1 - culling),
+      triangles: count * template.baseTriangles * (weightedTrianglePercent / 100) * (1 - culling),
     })
   })
 
@@ -118,7 +159,12 @@ export const calculatePerformance = (state: ProjectState): PerformanceResult => 
   state.pois.forEach((poi) => {
     const visible = isPoiVisible(poi, camera)
     if (!visible) {
-      byPoi.push({ poiId: poi.id, name: poi.name, dp: 0, triangles: 0, visible: false })
+      byPoi.push({ poiId: poi.id, name: poi.name, dp: 0, triangles: 0, visible: false, overlapRatio: 0 })
+      return
+    }
+    const { overlapRatio } = calculatePoiFrustumOverlap(poi, camera)
+    if (overlapRatio <= 0) {
+      byPoi.push({ poiId: poi.id, name: poi.name, dp: 0, triangles: 0, visible: false, overlapRatio: 0 })
       return
     }
     visiblePoiIds.push(poi.id)
@@ -131,7 +177,7 @@ export const calculatePerformance = (state: ProjectState): PerformanceResult => 
     )
     const poiDp = stats.reduce((sum, item) => sum + item.dp, 0)
     const poiTriangles = stats.reduce((sum, item) => sum + item.triangles, 0)
-    byPoi.push({ poiId: poi.id, name: poi.name, dp: poiDp, triangles: poiTriangles, visible: true })
+    byPoi.push({ poiId: poi.id, name: poi.name, dp: poiDp, triangles: poiTriangles, visible: true, overlapRatio })
 
     stats.forEach((item) => {
       const prev = byType.get(item.type) ?? { type: item.type, dp: 0, triangles: 0, count: 0 }
