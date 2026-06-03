@@ -70,27 +70,28 @@ export const calculatePoiContribution = (
   templates: ObjectTemplate[],
   quality: QualityLevel,
   camera: CameraConfig,
-  globalOcclusionRate: number,
+  globalCullingFactor: number,
 ) => {
   const center = getPoiCenter(poi)
   const dist = distance(center, camera)
-  const occlusion = clamp((poi.occlusionRate || globalOcclusionRate) / 100, 0, 1)
+  const culling = clamp((poi.cullingRate / 100) * globalCullingFactor, 0, 1)
   const result: CategoryStat[] = []
 
   ;(Object.keys(poi.objects) as ObjectType[]).forEach((type) => {
     const count = poi.objects[type]
     if (!count) return
     const template = poi.templateOverrides?.[type] ?? getTemplateForType(templates, type)
-    if (dist > template.disappearDistance * quality.lodScale) return
-    const useHlod = dist >= template.hlodDistance * quality.lodScale
+    const hasDisappearDistance = template.disappearDistance > 0
+    if (hasDisappearDistance && dist > template.disappearDistance * quality.lodScale) return
+    const useHlod = !hasDisappearDistance && dist >= template.hlodDistance * quality.lodScale
     const lod = pickLod(template, dist, quality.lodScale)
     const dpPercent = useHlod ? template.hlodDpPercent : lod.dpPercent
     const triPercent = useHlod ? template.hlodTrianglePercent : lod.trianglePercent
     result.push({
       type,
       count,
-      dp: count * template.baseDp * (dpPercent / 100) * (1 - occlusion),
-      triangles: count * template.baseTriangles * (triPercent / 100) * (1 - occlusion),
+      dp: count * template.baseDp * (dpPercent / 100) * (1 - culling),
+      triangles: count * template.baseTriangles * (triPercent / 100) * (1 - culling),
     })
   })
 
@@ -126,7 +127,7 @@ export const calculatePerformance = (state: ProjectState): PerformanceResult => 
       state.objectTemplates,
       quality,
       camera,
-      state.regionConfig.globalOcclusionRate,
+      state.regionConfig.globalCullingFactor,
     )
     const poiDp = stats.reduce((sum, item) => sum + item.dp, 0)
     const poiTriangles = stats.reduce((sum, item) => sum + item.triangles, 0)

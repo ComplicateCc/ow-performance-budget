@@ -207,6 +207,11 @@ button.danger {
   min-width: 0;
 }
 
+.icon-button {
+  align-self: end;
+  min-width: 36px;
+}
+
 .poi-list,
 .stat-list,
 .version-list {
@@ -316,6 +321,11 @@ button.danger {
   align-items: center;
 }
 
+.lod-head.budget-head,
+.lod-row.budget-row {
+  grid-template-columns: 52px 1fr 1fr 1fr 1fr 1fr;
+}
+
 .lod-head {
   color: #94a3b8;
   font-size: 12px;
@@ -329,6 +339,17 @@ button.danger {
   border-radius: 0;
   border-right: 1px solid #1e293b;
   padding: 7px;
+}
+
+.hlod-row {
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.hint-text {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .map-stage {
@@ -487,6 +508,57 @@ button.danger {
   border: 1px solid #1e293b;
   border-radius: 6px;
   background: #0f172a;
+}
+
+.simulate-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.simulate-title span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.simulate-table {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+}
+
+.simulate-head,
+.simulate-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 48px 1fr 48px;
+  align-items: center;
+}
+
+.simulate-head {
+  color: #94a3b8;
+  background: #0f172a;
+  font-size: 12px;
+}
+
+.simulate-head span,
+.simulate-row span,
+.simulate-row strong,
+.simulate-row input {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid #1e293b;
+  border-radius: 0;
+  padding: 7px 6px;
+  font-size: 12px;
+}
+
+.simulate-row strong {
+  color: #e2e8f0;
+  font-family: 'Fira Code', monospace;
+  font-weight: 500;
 }
 
 .stat-list.compact button {

@@ -45,10 +45,8 @@ export const emptyObjects = (): PoiObjects => ({
 
 const lods = (distanceScale = 1) => [
   { level: 0, start: 0, end: 25 * distanceScale, dpPercent: 100, trianglePercent: 100 },
-  { level: 1, start: 25 * distanceScale, end: 55 * distanceScale, dpPercent: 80, trianglePercent: 60 },
-  { level: 2, start: 55 * distanceScale, end: 100 * distanceScale, dpPercent: 55, trianglePercent: 35 },
-  { level: 3, start: 100 * distanceScale, end: 160 * distanceScale, dpPercent: 32, trianglePercent: 18 },
-  { level: 4, start: 160 * distanceScale, end: 240 * distanceScale, dpPercent: 14, trianglePercent: 8 },
+  { level: 1, start: 25 * distanceScale, end: 65 * distanceScale, dpPercent: 100, trianglePercent: 50 },
+  { level: 2, start: 65 * distanceScale, end: 120 * distanceScale, dpPercent: 100, trianglePercent: 30 },
 ]
 
 export const defaultTemplates: ObjectTemplate[] = [
@@ -56,6 +54,7 @@ export const defaultTemplates: ObjectTemplate[] = [
     id: 'tpl-meadow',
     type: 'meadow',
     name: '标准植被',
+    color: objectTypeMeta.meadow.color,
     baseDp: 1.2,
     baseTriangles: 260,
     lods: lods(0.8),
@@ -68,6 +67,7 @@ export const defaultTemplates: ObjectTemplate[] = [
     id: 'tpl-tree',
     type: 'tree',
     name: '标准树木',
+    color: objectTypeMeta.tree.color,
     baseDp: 2.6,
     baseTriangles: 1800,
     lods: lods(1),
@@ -80,6 +80,7 @@ export const defaultTemplates: ObjectTemplate[] = [
     id: 'tpl-building',
     type: 'building',
     name: '标准建筑',
+    color: objectTypeMeta.building.color,
     baseDp: 5,
     baseTriangles: 9000,
     lods: lods(1.4),
@@ -92,6 +93,7 @@ export const defaultTemplates: ObjectTemplate[] = [
     id: 'tpl-prop',
     type: 'prop',
     name: '标准小物件',
+    color: objectTypeMeta.prop.color,
     baseDp: 1.6,
     baseTriangles: 780,
     lods: lods(0.75),
@@ -104,6 +106,7 @@ export const defaultTemplates: ObjectTemplate[] = [
     id: 'tpl-effect',
     type: 'effect',
     name: '标准特效',
+    color: objectTypeMeta.effect.color,
     baseDp: 3.8,
     baseTriangles: 420,
     lods: lods(0.9),
@@ -119,7 +122,7 @@ export const defaultRegion: RegionConfig = {
   height: 1000,
   tileSize: 25,
   showGrid: true,
-  globalOcclusionRate: 18,
+  globalCullingFactor: 1,
 }
 
 export const defaultCamera: CameraConfig = {
@@ -193,7 +196,7 @@ export const defaultPois: PoiRegion[] = [
     y: 320,
     width: 210,
     height: 160,
-    occlusionRate: 38,
+    cullingRate: 50,
     objects: { meadow: 120, tree: 28, building: 9, prop: 55, effect: 4 },
   },
   {
@@ -205,7 +208,7 @@ export const defaultPois: PoiRegion[] = [
     y: 520,
     width: 160,
     height: 130,
-    occlusionRate: 45,
+    cullingRate: 50,
     objects: { meadow: 35, tree: 10, building: 6, prop: 120, effect: 6 },
   },
   {
@@ -217,7 +220,7 @@ export const defaultPois: PoiRegion[] = [
     y: 520,
     width: 220,
     height: 170,
-    occlusionRate: 20,
+    cullingRate: 50,
     objects: { meadow: 360, tree: 90, building: 0, prop: 28, effect: 2 },
   },
   {
@@ -229,7 +232,7 @@ export const defaultPois: PoiRegion[] = [
     y: 210,
     width: 90,
     height: 80,
-    occlusionRate: 28,
+    cullingRate: 50,
     objects: { meadow: 50, tree: 8, building: 2, prop: 34, effect: 3 },
   },
 ]

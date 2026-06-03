@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import {
   calculatePerformance,
   getBudgetStatus,
@@ -19,6 +19,9 @@ describe('performance calculation', () => {
 
   it('applies HLOD percentages after the switch distance', () => {
     const state = createDefaultProject()
+    state.objectTemplates = state.objectTemplates.map((template) =>
+      template.type === 'tree' ? { ...template, disappearDistance: 0 } : template,
+    )
     state.pois = [
       {
         id: 'near',
@@ -29,7 +32,7 @@ describe('performance calculation', () => {
         y: 600,
         width: 40,
         height: 40,
-        occlusionRate: 0,
+        cullingRate: 0,
         objects: { meadow: 0, tree: 10, building: 0, prop: 0, effect: 0 },
       },
       {
@@ -41,7 +44,7 @@ describe('performance calculation', () => {
         y: 420,
         width: 40,
         height: 40,
-        occlusionRate: 0,
+        cullingRate: 0,
         objects: { meadow: 0, tree: 10, building: 0, prop: 0, effect: 0 },
       },
     ]
@@ -67,7 +70,7 @@ describe('performance calculation', () => {
         y: 500,
         width: 60,
         height: 60,
-        occlusionRate: 0,
+        cullingRate: 0,
         objects: { meadow: 0, tree: 10, building: 0, prop: 0, effect: 0 },
       },
       {
@@ -79,7 +82,7 @@ describe('performance calculation', () => {
         y: 500,
         width: 60,
         height: 60,
-        occlusionRate: 50,
+        cullingRate: 50,
         objects: { meadow: 0, tree: 10, building: 0, prop: 0, effect: 0 },
       },
     ]
@@ -102,3 +105,4 @@ describe('performance calculation', () => {
     expect(getBudgetStatus(0.2, 0.9)).toBe('critical')
   })
 })
+

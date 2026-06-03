@@ -1,5 +1,5 @@
 export type Platform = 'pc' | 'console' | 'mobile'
-export type ObjectType = 'meadow' | 'tree' | 'building' | 'prop' | 'effect'
+export type ObjectType = string
 export type PoiLevel = 'XL' | 'L' | 'M' | 'S'
 export type BudgetStatus = 'safe' | 'warning' | 'critical'
 
@@ -8,7 +8,7 @@ export interface RegionConfig {
   height: number
   tileSize: 10 | 25 | 50 | 100
   showGrid: boolean
-  globalOcclusionRate: number
+  globalCullingFactor: number
 }
 
 export interface MetricBudget {
@@ -38,6 +38,7 @@ export interface ObjectTemplate {
   id: string
   type: ObjectType
   name: string
+  color: string
   baseDp: number
   baseTriangles: number
   lods: LodLevel[]
@@ -58,7 +59,7 @@ export interface PoiRegion {
   y: number
   width: number
   height: number
-  occlusionRate: number
+  cullingRate: number
   objects: PoiObjects
   templateOverrides?: Partial<Record<ObjectType, ObjectTemplate>>
 }

@@ -21,28 +21,23 @@ const lodSchema = z.object({
   trianglePercent: z.number().min(0).max(100),
 })
 
-const objectTypeSchema = z.enum(['meadow', 'tree', 'building', 'prop', 'effect'])
+const objectTypeSchema = z.string().min(1)
 
 export const objectTemplateSchema = z.object({
   id: z.string().min(1),
   type: objectTypeSchema,
   name: z.string().min(1),
+  color: z.string().min(1).default('#38bdf8'),
   baseDp: z.number().nonnegative(),
   baseTriangles: z.number().nonnegative(),
-  lods: z.array(lodSchema).min(1).max(5),
+  lods: z.array(lodSchema).min(1).max(3),
   hlodDistance: z.number().nonnegative(),
   hlodDpPercent: z.number().min(0).max(100),
   hlodTrianglePercent: z.number().min(0).max(100),
-  disappearDistance: z.number().positive(),
+  disappearDistance: z.number().nonnegative(),
 })
 
-const poiObjectsSchema = z.object({
-  meadow: z.number().nonnegative(),
-  tree: z.number().nonnegative(),
-  building: z.number().nonnegative(),
-  prop: z.number().nonnegative(),
-  effect: z.number().nonnegative(),
-})
+const poiObjectsSchema = z.record(z.number().nonnegative())
 
 const poiSchema = z.object({
   id: z.string().min(1),
@@ -53,7 +48,7 @@ const poiSchema = z.object({
   y: z.number(),
   width: z.number().positive(),
   height: z.number().positive(),
-  occlusionRate: z.number().min(0).max(100),
+  cullingRate: z.number().min(0).max(100),
   objects: poiObjectsSchema,
 })
 
@@ -72,7 +67,7 @@ const regionSchema = z.object({
   height: z.number().min(100).max(2000),
   tileSize: z.union([z.literal(10), z.literal(25), z.literal(50), z.literal(100)]),
   showGrid: z.boolean(),
-  globalOcclusionRate: z.number().min(0).max(100),
+  globalCullingFactor: z.number().min(0).max(2),
 })
 
 const qualityConfigsSchema = z.object({
@@ -88,7 +83,7 @@ const snapshotSchema = z.object({
   platform: z.enum(['pc', 'console', 'mobile']),
   qualityLevel: z.number().int().min(0).max(5),
   qualityConfigs: qualityConfigsSchema,
-  objectTemplates: z.array(objectTemplateSchema).min(5),
+  objectTemplates: z.array(objectTemplateSchema).min(1),
   pois: z.array(poiSchema),
   camera: cameraSchema,
 })

@@ -31,7 +31,7 @@ import {
   getQuality,
   toRad,
 } from './calc'
-import { objectTypeMeta, platformLabel, poiLevelMeta } from './data'
+import { platformLabel, poiLevelMeta } from './data'
 import {
   downloadJson,
   exportReport,
@@ -42,9 +42,8 @@ import {
   readJsonFile,
 } from './io'
 import { useAppStore } from './store'
-import type { ObjectTemplate, ObjectType, PoiLevel, PoiRegion, ProjectState } from './types'
+import type { ObjectTemplate, PoiLevel, PoiRegion, ProjectState } from './types'
 
-const objectTypes = Object.keys(objectTypeMeta) as ObjectType[]
 const poiLevels = Object.keys(poiLevelMeta) as PoiLevel[]
 
 const fmt = (value: number) => Math.round(value).toLocaleString()
@@ -492,26 +491,27 @@ function PoiPanel() {
 
 function PoiEditor({ poi }: { poi: PoiRegion }) {
   const state = useAppStore()
+  const templates = state.objectTemplates
   return (
     <div className="editor-card">
       <input className="title-input" value={poi.name} onChange={(event) => state.updatePoi(poi.id, { name: event.target.value })} />
       <textarea value={poi.description} placeholder="描述" onChange={(event) => state.updatePoi(poi.id, { description: event.target.value })} />
       <div className="grid-two">
         <SelectField label="等级" value={poi.level} options={poiLevels.map((level) => ({ value: level, label: `${poiLevelMeta[level].name} ${level}` }))} onChange={(level) => state.updatePoi(poi.id, { level })} />
-        <NumberField label="遮挡率 %" value={poi.occlusionRate} min={0} max={100} onChange={(value) => state.updatePoi(poi.id, { occlusionRate: value })} />
+        <NumberField label="遮挡剔除率 %" value={poi.cullingRate} min={0} max={100} onChange={(value) => state.updatePoi(poi.id, { cullingRate: value })} />
         <NumberField label="X" value={Math.round(poi.x)} onChange={(value) => state.updatePoi(poi.id, { x: value })} />
         <NumberField label="Y" value={Math.round(poi.y)} onChange={(value) => state.updatePoi(poi.id, { y: value })} />
         <NumberField label="宽 m" value={Math.round(poi.width)} min={20} onChange={(value) => state.updatePoi(poi.id, { width: value })} />
         <NumberField label="高 m" value={Math.round(poi.height)} min={20} onChange={(value) => state.updatePoi(poi.id, { height: value })} />
       </div>
       <div className="object-counts">
-        {objectTypes.map((type) => (
+        {templates.map((template) => (
           <NumberField
-            key={type}
-            label={objectTypeMeta[type].name}
-            value={poi.objects[type]}
+            key={template.type}
+            label={template.name}
+            value={poi.objects[template.type] ?? 0}
             min={0}
-            onChange={(value) => state.updatePoiObject(poi.id, type, value)}
+            onChange={(value) => state.updatePoiObject(poi.id, template.type, value)}
           />
         ))}
       </div>
@@ -528,43 +528,61 @@ function TemplatePanel() {
   const state = useAppStore()
   const template = state.objectTemplates.find((item) => item.type === state.selectedTemplateType) ?? state.objectTemplates[0]
   const updateTemplate = (patch: Partial<ObjectTemplate>) => state.updateTemplate({ ...template, ...patch })
+  const updateLod = (index: number, patch: Partial<ObjectTemplate['lods'][number]>) => {
+    const lods = template.lods.map((item, i) => (i === index ? { ...item, ...patch } : item))
+    state.updateTemplate({ ...template, lods })
+  }
+  const pctFromValue = (value: number, base: number) => (base > 0 ? (value / base) * 100 : 0)
   return (
     <section className="panel-section">
       <div className="section-title"><Boxes size={17} /> 物件模板</div>
-      <SelectField
-        label="类型"
-        value={state.selectedTemplateType}
-        options={objectTypes.map((type) => ({ value: type, label: objectTypeMeta[type].name }))}
-        onChange={state.setSelectedTemplateType}
-      />
+      <div className="toolbar-row">
+        <SelectField
+          label="类型"
+          value={state.selectedTemplateType}
+          options={state.objectTemplates.map((item) => ({ value: item.type, label: item.name }))}
+          onChange={state.setSelectedTemplateType}
+        />
+        <button className="icon-button" title="新增物件类型模板" onClick={state.createTemplate}><Plus size={16} /></button>
+      </div>
+      <div className="grid-two">
+        <label className="field">
+          <span>模板名称</span>
+          <input value={template.name} onChange={(event) => updateTemplate({ name: event.target.value })} />
+        </label>
+        <label className="field">
+          <span>颜色</span>
+          <input type="color" value={template.color} onChange={(event) => updateTemplate({ color: event.target.value })} />
+        </label>
+      </div>
       <div className="grid-two">
         <NumberField label="LOD0 DP" value={template.baseDp} step={0.1} min={0} onChange={(value) => updateTemplate({ baseDp: value })} />
         <NumberField label="LOD0 Tri" value={template.baseTriangles} min={0} onChange={(value) => updateTemplate({ baseTriangles: value })} />
         <NumberField label="HLOD 距离" value={template.hlodDistance} min={0} onChange={(value) => updateTemplate({ hlodDistance: value })} />
-        <NumberField label="消失距离" value={template.disappearDistance} min={1} onChange={(value) => updateTemplate({ disappearDistance: value })} />
-        <NumberField label="HLOD DP%" value={template.hlodDpPercent} min={0} max={100} onChange={(value) => updateTemplate({ hlodDpPercent: value })} />
-        <NumberField label="HLOD Tri%" value={template.hlodTrianglePercent} min={0} max={100} onChange={(value) => updateTemplate({ hlodTrianglePercent: value })} />
+        <NumberField label="消失距离(0进HLOD)" value={template.disappearDistance} min={0} onChange={(value) => updateTemplate({ disappearDistance: value })} />
       </div>
       <div className="lod-table">
-        <div className="lod-head"><span>LOD</span><span>距离</span><span>DP%</span><span>Tri%</span></div>
+        <div className="lod-head budget-head"><span>层级</span><span>距离</span><span>DP%</span><span>DP定值</span><span>Tri%</span><span>Tri定值</span></div>
         {template.lods.map((lod, index) => (
-          <div className="lod-row" key={lod.level}>
+          <div className="lod-row budget-row" key={lod.level}>
             <span>LOD{lod.level}</span>
-            <input value={lod.end} type="number" onChange={(event) => {
-              const lods = template.lods.map((item, i) => i === index ? { ...item, end: Number(event.target.value) } : item)
-              state.updateTemplate({ ...template, lods })
-            }} />
-            <input value={lod.dpPercent} type="number" onChange={(event) => {
-              const lods = template.lods.map((item, i) => i === index ? { ...item, dpPercent: Number(event.target.value) } : item)
-              state.updateTemplate({ ...template, lods })
-            }} />
-            <input value={lod.trianglePercent} type="number" onChange={(event) => {
-              const lods = template.lods.map((item, i) => i === index ? { ...item, trianglePercent: Number(event.target.value) } : item)
-              state.updateTemplate({ ...template, lods })
-            }} />
+            <input value={lod.end} type="number" onChange={(event) => updateLod(index, { end: Number(event.target.value) })} />
+            <input value={lod.dpPercent} type="number" onChange={(event) => updateLod(index, { dpPercent: Number(event.target.value) })} />
+            <input value={Number((template.baseDp * lod.dpPercent / 100).toFixed(2))} type="number" step="0.1" onChange={(event) => updateLod(index, { dpPercent: pctFromValue(Number(event.target.value), template.baseDp) })} />
+            <input value={lod.trianglePercent} type="number" onChange={(event) => updateLod(index, { trianglePercent: Number(event.target.value) })} />
+            <input value={Math.round(template.baseTriangles * lod.trianglePercent / 100)} type="number" onChange={(event) => updateLod(index, { trianglePercent: pctFromValue(Number(event.target.value), template.baseTriangles) })} />
           </div>
         ))}
+        <div className="lod-row budget-row hlod-row">
+          <span>HLOD</span>
+          <input value={template.hlodDistance} type="number" onChange={(event) => updateTemplate({ hlodDistance: Number(event.target.value) })} />
+          <input value={template.hlodDpPercent} type="number" onChange={(event) => updateTemplate({ hlodDpPercent: Number(event.target.value) })} />
+          <input value={Number((template.baseDp * template.hlodDpPercent / 100).toFixed(2))} type="number" step="0.1" onChange={(event) => updateTemplate({ hlodDpPercent: pctFromValue(Number(event.target.value), template.baseDp) })} />
+          <input value={template.hlodTrianglePercent} type="number" onChange={(event) => updateTemplate({ hlodTrianglePercent: Number(event.target.value) })} />
+          <input value={Math.round(template.baseTriangles * template.hlodTrianglePercent / 100)} type="number" onChange={(event) => updateTemplate({ hlodTrianglePercent: pctFromValue(Number(event.target.value), template.baseTriangles) })} />
+        </div>
       </div>
+      <p className="hint-text">消失距离大于 0 时，超过该距离后不再计入预算，也不会进入 HLOD；消失距离为 0 时按 HLOD 距离切换。</p>
     </section>
   )
 }
@@ -580,7 +598,7 @@ function ConfigPanel() {
         <NumberField label="宽度 m" value={state.regionConfig.width} min={100} max={2000} onChange={(value) => state.updateRegion({ width: value })} />
         <NumberField label="高度 m" value={state.regionConfig.height} min={100} max={2000} onChange={(value) => state.updateRegion({ height: value })} />
         <SelectField label="地块" value={String(state.regionConfig.tileSize)} options={[10, 25, 50, 100].map((size) => ({ value: String(size), label: `${size}m` }))} onChange={(value) => state.updateRegion({ tileSize: Number(value) as 10 | 25 | 50 | 100 })} />
-        <NumberField label="全局遮挡 %" value={state.regionConfig.globalOcclusionRate} min={0} max={100} onChange={(value) => state.updateRegion({ globalOcclusionRate: value })} />
+        <NumberField label="全局剔除系数" value={state.regionConfig.globalCullingFactor} min={0} max={2} step={0.05} onChange={(value) => state.updateRegion({ globalCullingFactor: value })} />
       </div>
       <div className="segmented six">
         {[0, 1, 2, 3, 4, 5].map((level) => (
@@ -648,8 +666,57 @@ function CameraPanel() {
   )
 }
 
+function TemplateSimulationPanel() {
+  const state = useAppStore()
+  const template = state.objectTemplates.find((item) => item.type === state.selectedTemplateType) ?? state.objectTemplates[0]
+  if (!template) return null
+  const pctFromValue = (value: number, base: number) => (base > 0 ? (value / base) * 100 : 0)
+  const updateLodValue = (index: number, metric: 'dp' | 'triangles', value: number) => {
+    const lods = template.lods.map((lod, i) =>
+      i === index
+        ? {
+            ...lod,
+            ...(metric === 'dp'
+              ? { dpPercent: pctFromValue(value, template.baseDp) }
+              : { trianglePercent: pctFromValue(value, template.baseTriangles) }),
+          }
+        : lod,
+    )
+    state.updateTemplate({ ...template, lods })
+  }
+  return (
+    <section className="panel-section">
+      <div className="section-title"><Boxes size={17} /> 模板模拟值</div>
+      <div className="simulate-title">
+        <span style={{ background: template.color }} />
+        <strong>{template.name}</strong>
+      </div>
+      <div className="simulate-table">
+        <div className="simulate-head"><span>层级</span><span>DP定值</span><span>DP%</span><span>Tri定值</span><span>Tri%</span></div>
+        {template.lods.map((lod, index) => (
+          <div className="simulate-row" key={lod.level}>
+            <span>LOD{lod.level}</span>
+            <input type="number" value={Number((template.baseDp * lod.dpPercent / 100).toFixed(2))} step="0.1" onChange={(event) => updateLodValue(index, 'dp', Number(event.target.value))} />
+            <strong>{Math.round(lod.dpPercent)}%</strong>
+            <input type="number" value={Math.round(template.baseTriangles * lod.trianglePercent / 100)} onChange={(event) => updateLodValue(index, 'triangles', Number(event.target.value))} />
+            <strong>{Math.round(lod.trianglePercent)}%</strong>
+          </div>
+        ))}
+        <div className="simulate-row hlod-row">
+          <span>HLOD</span>
+          <input type="number" value={Number((template.baseDp * template.hlodDpPercent / 100).toFixed(2))} step="0.1" onChange={(event) => state.updateTemplate({ ...template, hlodDpPercent: pctFromValue(Number(event.target.value), template.baseDp) })} />
+          <strong>{Math.round(template.hlodDpPercent)}%</strong>
+          <input type="number" value={Math.round(template.baseTriangles * template.hlodTrianglePercent / 100)} onChange={(event) => state.updateTemplate({ ...template, hlodTrianglePercent: pctFromValue(Number(event.target.value), template.baseTriangles) })} />
+          <strong>{Math.round(template.hlodTrianglePercent)}%</strong>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function StatsPanel({ result }: { result: ReturnType<typeof calculatePerformance> }) {
   const state = useAppStore()
+  const templateByType = new globalThis.Map(state.objectTemplates.map((template) => [template.type, template]))
   const selectedIds = state.compareVersionIds
   const versions = selectedIds.map((id) => state.versions.find((item) => item.id === id)).filter(Boolean)
   const comparisons = versions.map((version) => ({ version, result: calculatePerformance({ ...version!.snapshot, versions: [] }) }))
@@ -666,13 +733,14 @@ function StatsPanel({ result }: { result: ReturnType<typeof calculatePerformance
         <div className="stat-list">
           {result.byType.map((item) => (
             <div key={item.type} className="stat-row">
-              <span style={{ color: objectTypeMeta[item.type].color }}>{objectTypeMeta[item.type].name}</span>
+              <span style={{ color: templateByType.get(item.type)?.color ?? '#38bdf8' }}>{templateByType.get(item.type)?.name ?? item.type}</span>
               <strong>{fmt(item.dp)} DP</strong>
               <small>{fmt(item.triangles)} Tri / {fmt(item.count)} 件</small>
             </div>
           ))}
         </div>
       </section>
+      <TemplateSimulationPanel />
       <section className="panel-section">
         <div className="section-title"><MousePointer2 size={17} /> POI 统计</div>
         <div className="stat-list compact">

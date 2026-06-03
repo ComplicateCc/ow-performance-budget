@@ -14,6 +14,11 @@ import type {
 } from './types'
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
+const templateObjects = (templates: ObjectTemplate[]) =>
+  Object.fromEntries(templates.map((template) => [template.type, 0]))
+
+const withTemplateObjectKeys = (pois: PoiRegion[], templates: ObjectTemplate[]) =>
+  pois.map((poi) => ({ ...poi, objects: { ...templateObjects(templates), ...poi.objects } }))
 
 const snapshotOf = (state: ProjectState): Omit<ProjectState, 'versions'> => {
   return structuredClone({
@@ -50,6 +55,7 @@ interface AppStore extends ProjectState {
   copyPoi: (id: string) => void
   pastePoi: () => void
   updatePoiObject: (poiId: string, type: ObjectType, count: number) => void
+  createTemplate: () => void
   updateTemplate: (template: ObjectTemplate) => void
   setSelectedTemplateType: (type: ObjectType) => void
   updateQualityConfig: (platform: Platform, level: number, patch: Partial<QualityConfigs[Platform][number]>) => void
@@ -77,6 +83,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({
       ...project,
       platform: 'mobile',
+      pois: withTemplateObjectKeys(project.pois, project.objectTemplates),
       selectedPoiId: project.pois[0]?.id ?? null,
       copiedPoi: null,
       importError: null,
@@ -124,9 +131,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         y: clamp(y - size / 2, 0, Math.max(0, state.regionConfig.height - size)),
         width: size,
         height: size * 0.75,
-        occlusionRate: state.regionConfig.globalOcclusionRate,
+        cullingRate: 50,
         objects: {
           ...emptyObjects(),
+          ...templateObjects(state.objectTemplates),
           meadow: level === 'S' ? 40 : 120,
           tree: level === 'XL' ? 80 : 25,
           building: level === 'XL' ? 18 : level === 'L' ? 8 : 2,
@@ -147,7 +155,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
               y: clamp(patch.y ?? poi.y, 0, Math.max(0, state.regionConfig.height - (patch.height ?? poi.height))),
               width: clamp(patch.width ?? poi.width, 20, state.regionConfig.width),
               height: clamp(patch.height ?? poi.height, 20, state.regionConfig.height),
-              occlusionRate: clamp(patch.occlusionRate ?? poi.occlusionRate, 0, 100),
+              cullingRate: clamp(patch.cullingRate ?? poi.cullingRate, 0, 100),
             }
           : poi,
       ),
@@ -185,6 +193,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
         poi.id === poiId ? { ...poi, objects: { ...poi.objects, [type]: Math.max(0, Math.round(count)) } } : poi,
       ),
     })),
+  createTemplate: () =>
+    set((state) => {
+      const index = state.objectTemplates.length + 1
+      const type = `custom-${index}`
+      const template: ObjectTemplate = {
+        id: uid('tpl'),
+        type,
+        name: `自定义物件 ${index}`,
+        color: '#38bdf8',
+        baseDp: 1,
+        baseTriangles: 500,
+        lods: [
+          { level: 0, start: 0, end: 30, dpPercent: 100, trianglePercent: 100 },
+          { level: 1, start: 30, end: 80, dpPercent: 100, trianglePercent: 50 },
+          { level: 2, start: 80, end: 150, dpPercent: 100, trianglePercent: 30 },
+        ],
+        hlodDistance: 150,
+        hlodDpPercent: 100,
+        hlodTrianglePercent: 20,
+        disappearDistance: 220,
+      }
+      return {
+        objectTemplates: [...state.objectTemplates, template],
+        pois: state.pois.map((poi) => ({ ...poi, objects: { ...poi.objects, [type]: 0 } })),
+        selectedTemplateType: type,
+      }
+    }),
   updateTemplate: (template) =>
     set((state) => ({
       objectTemplates: state.objectTemplates.map((item) => (item.id === template.id ? template : item)),
@@ -209,7 +244,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ],
     })),
   setCompareVersionIds: (compareVersionIds) => set({ compareVersionIds: compareVersionIds.slice(0, 2) }),
-  importTemplates: (objectTemplates) => set({ objectTemplates }),
+  importTemplates: (objectTemplates) =>
+    set((state) => ({
+      objectTemplates,
+      pois: withTemplateObjectKeys(state.pois, objectTemplates),
+      selectedTemplateType: objectTemplates[0]?.type ?? state.selectedTemplateType,
+    })),
   importQualityConfigs: (qualityConfigs) => set({ qualityConfigs }),
   setImportError: (importError) => set({ importError }),
 }))
