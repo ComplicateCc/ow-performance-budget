@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POI 区域性能预算工具操作手册</title>
+  <style>
+    :root {
+      color: #dbe7f3;
+      background: #07111f;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #07111f;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 42px 28px 72px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      color: #f8fafc;
+      line-height: 1.25;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+    }
+
+    h2 {
+      margin-top: 34px;
+      padding-top: 22px;
+      border-top: 1px solid #23324a;
+      font-size: 24px;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 8px 0 12px;
+      color: #b8c7d9;
+    }
+
+    ul,
+    ol {
+      padding-left: 24px;
+      color: #c7d5e6;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    table {
+      width: 100%;
+      margin: 14px 0 20px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid #23324a;
+      border-radius: 8px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #23324a;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #e2e8f0;
+      background: #101d30;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      color: #bae6fd;
+      background: #0f1e33;
+      font-family: Consolas, "Fira Code", monospace;
+    }
+
+    .hero {
+      padding: 28px;
+      border: 1px solid #23324a;
+      border-radius: 8px;
+      background: #0d1a2b;
+    }
+
+    .meta {
+      color: #7dd3fc;
+      font-size: 14px;
+    }
+
+    .note {
+      margin: 14px 0;
+      padding: 12px 14px;
+      border-left: 4px solid #22c55e;
+      border-radius: 6px;
+      color: #d9f99d;
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .warning {
+      border-left-color: #f59e0b;
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 14px;
+      border: 1px solid #23324a;
+      border-radius: 8px;
+      background: #0c1728;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 28px 18px 56px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="meta">POI 区域性能预算工具 · 操作手册</p>
+      <h1>单区域 POI 性能规划与热力评估</h1>
+      <p>
+        本工具用于在最多 <code>2000m × 2000m</code> 的单个规划区域内，评估 POI、默认环境层、LOD/HLOD、遮挡剔除和 Android 画质预算之间的关系。
+        它不是完整大世界编辑器，而是面向区域 POI 布局和实时性能预算的本地浏览器工具。
+      </p>
+    </section>
+
+    <h2>1. 启动方式</h2>
+    <ol>
+      <li>进入项目目录：<code>C:\Projects\AI\CodeX\ow-performance-budget</code></li>
+      <li>安装依赖：<code>npm install</code></li>
+      <li>启动开发服务：<code>npm run dev -- --host 127.0.0.1 --port 5174</code></li>
+      <li>浏览器打开：<code>http://127.0.0.1:5174/</code></li>
+    </ol>
+    <p class="note warning">
+      如果 <code>5173</code> 已被其他项目占用，请继续使用 <code>5174</code> 或换一个空闲端口。
+    </p>
+
+    <h2>2. 界面结构</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>左侧面板</h3>
+        <p>配置默认层、POI 列表、POI 参数、物件模板、区域大小、Android 画质预算。</p>
+      </div>
+      <div class="card">
+        <h3>中央地图</h3>
+        <p>显示区域网格、POI 矩形、相机视锥、LOD 可视范围和网格热力图。</p>
+      </div>
+      <div class="card">
+        <h3>右侧面板</h3>
+        <p>查看实时 DP/Triangles、分类统计、POI 统计、模板模拟值、相机参数、数据导入导出和版本对比。</p>
+      </div>
+      <div class="card">
+        <h3>顶部栏</h3>
+        <p>快速切换热力图开关，以及在 <code>DP</code> 和 <code>Triangles</code> 两种热力指标之间切换。</p>
+      </div>
+    </div>
+
+    <h2>3. 推荐工作流</h2>
+    <ol>
+      <li>先在“区域与 Android 画质”里设置区域宽高、地块大小、画质等级和预算。</li>
+      <li>配置“默认层”，让非 POI 区域具备基础环境负载。</li>
+      <li>在地图上双击创建 POI，或用左侧 POI 管理面板新增、复制、删除 POI。</li>
+      <li>选中 POI 后，调整位置、尺寸、等级、遮挡剔除率和物件数量。</li>
+      <li>调整物件模板的 LOD/HLOD/消失距离，观察右侧预算变化。</li>
+      <li>打开热力图，切换 DP/Triangles，检查不同地块和方向的压力分布。</li>
+      <li>保存项目 JSON 或导出 HTML 报告，用快照功能记录阶段版本。</li>
+    </ol>
+
+    <h2>4. 地图操作</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>操作</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>双击地图</td>
+          <td>在点击位置创建一个默认 M 级 POI。</td>
+        </tr>
+        <tr>
+          <td>点击 POI</td>
+          <td>选中 POI。若多个 POI 重叠，会优先选中面积较小的 POI。</td>
+        </tr>
+        <tr>
+          <td>拖动 POI</td>
+          <td>移动 POI 位置，右侧性能数据会实时刷新。</td>
+        </tr>
+        <tr>
+          <td>拖动 POI 右下角</td>
+          <td>调整 POI 尺寸。</td>
+        </tr>
+        <tr>
+          <td>拖动相机点</td>
+          <td>移动视锥采样位置。</td>
+        </tr>
+        <tr>
+          <td>拖动相机朝向手柄</td>
+          <td>旋转视角方向。</td>
+        </tr>
+        <tr>
+          <td>滚轮或缩放滑杆</td>
+          <td>缩放画布视图，不改变实际区域尺寸。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. 默认层</h2>
+    <p>
+      默认层覆盖整个区域里的非 POI 部分，结构与 POI 一致，包含等级、遮挡剔除率和各类物件数量。
+      计算时它会排除所有 POI 占用区域，避免默认层和 POI 重复统计。
+    </p>
+    <p class="note">
+      默认层适合放置基础植被、散布小物件、远景环境等“非重点 POI”的背景负载。
+    </p>
+
+    <h2>6. POI 管理</h2>
+    <ul>
+      <li><strong>等级：</strong>支持 <code>XL/L/M/S</code>，影响默认创建尺寸和视觉颜色。</li>
+      <li><strong>遮挡剔除率：</strong>POI 自身剔除比例，默认 50%。实际计算还会乘以全局剔除系数。</li>
+      <li><strong>位置和尺寸：</strong>支持面板输入，也支持地图拖动。</li>
+      <li><strong>物件数量：</strong>每个 POI 可配置各物件模板的聚合数量，不逐个摆放单体资产。</li>
+      <li><strong>复制/粘贴/副本：</strong>可用按钮，也支持常见快捷键复制粘贴选中 POI。</li>
+    </ul>
+
+    <h2>7. 物件模板、LOD 与 HLOD</h2>
+    <p>
+      每种物件类型都有基础 DP、基础 Triangles、3 级 LOD、HLOD 和消失距离。
+      左侧模板面板负责定义规则，右侧“模板模拟值”面板可以直接修改定值，百分比会自动同步。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>字段</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>LOD DP%</td>
+          <td>对应 LOD 下的 Draw Call 百分比。默认 3 级均为 100%。</td>
+        </tr>
+        <tr>
+          <td>LOD Tri%</td>
+          <td>对应 LOD 下的面数百分比。默认 100%、50%、30%。</td>
+        </tr>
+        <tr>
+          <td>HLOD 距离</td>
+          <td>超过该距离后使用 HLOD 的 DP/Tri 百分比。</td>
+        </tr>
+        <tr>
+          <td>消失距离</td>
+          <td>大于 0 时，超过该距离后不再计入预算，也不会进入 HLOD。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>8. 热力图</h2>
+    <p>
+      热力图使用网格采样。每个地块在中心点分别向上、右、下、左四个方向模拟一次视锥预算，然后用四个三角区域显示结果。
+      地块大小默认 <code>64m × 64m</code>，可在左侧区域设置中调整。
+    </p>
+    <ul>
+      <li><strong>DP/Triangles：</strong>顶部下拉框切换热力图指标。</li>
+      <li><strong>热力透明：</strong>控制整体覆盖强度，方便未来叠加地图背景。</li>
+      <li><strong>低负载淡化：</strong>低负载区域会降低透明度，避免整图都是绿色时遮挡网格。</li>
+      <li><strong>网格置顶：</strong>热力图绘制在网格下方，打开热力图后仍能看清网格线。</li>
+    </ul>
+
+    <h2>9. 性能计算逻辑</h2>
+    <ol>
+      <li>根据当前相机视锥判断 POI 或默认层采样点是否可见。</li>
+      <li>按采样点距离选择 LOD 或 HLOD。</li>
+      <li>应用物件模板的基础 DP/Triangles 与百分比。</li>
+      <li>应用 POI 或默认层遮挡剔除率，再乘全局剔除系数。</li>
+      <li>汇总分类、POI 和总量，与当前 Android 画质预算对比。</li>
+    </ol>
+
+    <h2>10. Android 画质预算</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>画质</th>
+          <th>Tri 上限</th>
+          <th>DP 上限</th>
+          <th>设备示例</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Q5 极致</td><td>600,000</td><td>500</td><td>旗舰机型，如 iQOO 13 / 小米 15</td></tr>
+        <tr><td>Q4 电影</td><td>330,000</td><td>275</td><td>高端旗舰，如 iQOO 12 Pro</td></tr>
+        <tr><td>Q3 超清</td><td>300,000</td><td>225</td><td>次旗舰，如 iQOO 11 Pro</td></tr>
+        <tr><td>Q2 高清</td><td>255,000</td><td>225</td><td>中端主力，如小米 10/11</td></tr>
+        <tr><td>Q1 均衡</td><td>150,000</td><td>150</td><td>中低端，如红米 Note 11</td></tr>
+        <tr><td>Q0 流畅</td><td>150,000</td><td>150</td><td>入门机型，如红米 Note 8</td></tr>
+      </tbody>
+    </table>
+
+    <h2>11. 数据与报告</h2>
+    <ul>
+      <li><strong>保存项目：</strong>导出完整项目 JSON，包括区域、默认层、POI、模板、画质配置和版本快照。</li>
+      <li><strong>加载项目：</strong>导入项目 JSON。导入前会校验格式，失败时保留当前工作。</li>
+      <li><strong>模板导入/导出：</strong>只保存或加载物件模板。</li>
+      <li><strong>画质导入/导出：</strong>只保存或加载 Android 画质预算配置。</li>
+      <li><strong>HTML 报告：</strong>导出当前性能结果，可用浏览器打印或另存为 PDF。</li>
+      <li><strong>截图：</strong>导出当前地图区域截图。</li>
+      <li><strong>版本快照：</strong>保存阶段方案，并在右侧面板进行对比。</li>
+    </ul>
+
+    <h2>12. 注意事项</h2>
+    <ul>
+      <li>本工具只针对单个规划区域，最大支持 <code>2000m × 2000m</code>。</li>
+      <li>POI 内物件按聚合数量计算，不代表真实单体摆放。</li>
+      <li>热力图是采样模拟结果，用于发现压力区域和方向差异，不等同于最终引擎 Profiler 数据。</li>
+      <li>数字输入框会在失焦或回车后提交，输入过程中不会立刻强制跳到最小值。</li>
+    </ul>
+  </main>
+</body>
+</html>
