@@ -193,6 +193,17 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
   const selectedPoi = state.pois.find((poi) => poi.id === state.selectedPoiId) ?? null
   const heatSamples = useMemo(() => (state.heatmapEnabled ? buildHeatSamples(state) : []), [state])
   const heatBudget = state.heatmapMetric === 'dp' ? result.dpBudget : result.triangleBudget
+  const heatPeak = useMemo(() => {
+    if (!heatSamples.length) return 1
+    return Math.max(
+      1,
+      ...heatSamples.flatMap((sample) =>
+        [sample.up, sample.right, sample.down, sample.left].map((metric) =>
+          state.heatmapMetric === 'dp' ? metric.dp : metric.triangles,
+        ),
+      ),
+    )
+  }, [heatSamples, state.heatmapMetric])
   const view = useMemo(() => {
     const padding = 56
     const baseZoom = Math.min(
@@ -271,7 +282,8 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
     if (state.heatmapEnabled && heatSamples.length) {
       const heatColor = (value: number) => {
         const ratio = clamp(value / Math.max(1, heatBudget), 0, 1.4)
-        const normalized = clamp(ratio, 0, 1)
+        const localRatio = clamp(value / heatPeak, 0, 1)
+        const normalized = clamp(Math.max(ratio, localRatio * 0.35), 0, 1)
         const fadeThreshold = Math.max(0.01, state.heatmapLowFade)
         const fadeRatio = clamp(normalized / fadeThreshold, 0, 1)
         const baseAlpha =
@@ -396,7 +408,7 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
     ctx.fillStyle = '#94a3b8'
     ctx.font = '12px Fira Code, monospace'
     ctx.fillText(`X ${Math.round(pointer.x)} / Y ${Math.round(pointer.y)} / Zoom ${Math.round(view.zoom * 100)}%`, 16, rect.height - 16)
-  }, [state, view, pointer, result, heatSamples, heatBudget, canvasSize])
+  }, [state, view, pointer, result, heatSamples, heatBudget, heatPeak, canvasSize])
 
   const hitPoi = (x: number, y: number) =>
     state.pois
