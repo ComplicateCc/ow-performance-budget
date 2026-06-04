@@ -65,6 +65,18 @@ function NumberField({
   step?: number
   onChange: (value: number) => void
 }) {
+  const [draft, setDraft] = useState(String(Number.isFinite(value) ? value : 0))
+  useEffect(() => {
+    setDraft(String(Number.isFinite(value) ? value : 0))
+  }, [value])
+  const commit = () => {
+    const next = Number(draft)
+    if (!Number.isFinite(next)) {
+      setDraft(String(Number.isFinite(value) ? value : 0))
+      return
+    }
+    onChange(clamp(next, min ?? -Number.MAX_SAFE_INTEGER, max ?? Number.MAX_SAFE_INTEGER))
+  }
   return (
     <label className="field">
       <span>{label}</span>
@@ -73,8 +85,18 @@ function NumberField({
         min={min}
         max={max}
         step={step}
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(event) => onChange(Number(event.target.value))}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur()
+          }
+          if (event.key === 'Escape') {
+            setDraft(String(Number.isFinite(value) ? value : 0))
+            event.currentTarget.blur()
+          }
+        }}
       />
     </label>
   )
@@ -377,7 +399,10 @@ function MapCanvas({ result }: { result: ReturnType<typeof calculatePerformance>
   }, [state, view, pointer, result, heatSamples, heatBudget, canvasSize])
 
   const hitPoi = (x: number, y: number) =>
-    [...state.pois].reverse().find((poi) => x >= poi.x && x <= poi.x + poi.width && y >= poi.y && y <= poi.y + poi.height)
+    state.pois
+      .map((poi, index) => ({ poi, index }))
+      .filter(({ poi }) => x >= poi.x && x <= poi.x + poi.width && y >= poi.y && y <= poi.y + poi.height)
+      .sort((a, b) => a.poi.width * a.poi.height - b.poi.width * b.poi.height || b.index - a.index)[0]?.poi
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -617,6 +642,43 @@ function PoiEditor({ poi }: { poi: PoiRegion }) {
   )
 }
 
+function DefaultLayerPanel() {
+  const state = useAppStore()
+  const layer = state.defaultLayer
+  const coveredArea = state.pois.reduce((sum, poi) => sum + poi.width * poi.height, 0)
+  const regionArea = state.regionConfig.width * state.regionConfig.height
+  const nonPoiRatio = Math.max(0, 1 - coveredArea / Math.max(1, regionArea))
+
+  return (
+    <section className="panel-section">
+      <div className="section-title"><Layers size={17} /> 默认层</div>
+      <div className="default-layer-summary">
+        <strong>{Math.round(nonPoiRatio * 100)}%</strong>
+        <span>按非 POI 区域参与预算，不与 POI 区域重复计算</span>
+      </div>
+      <div className="editor-card compact-editor">
+        <input className="title-input" value={layer.name} onChange={(event) => state.updateDefaultLayer({ name: event.target.value })} />
+        <textarea value={layer.description} placeholder="描述" onChange={(event) => state.updateDefaultLayer({ description: event.target.value })} />
+        <div className="grid-two">
+          <SelectField label="等级" value={layer.level} options={poiLevels.map((level) => ({ value: level, label: `${poiLevelMeta[level].name} ${level}` }))} onChange={(level) => state.updateDefaultLayer({ level })} />
+          <NumberField label="遮挡剔除率 %" value={layer.cullingRate} min={0} max={100} onChange={(value) => state.updateDefaultLayer({ cullingRate: value })} />
+        </div>
+        <div className="object-counts">
+          {state.objectTemplates.map((template) => (
+            <NumberField
+              key={template.type}
+              label={template.name}
+              value={layer.objects[template.type] ?? 0}
+              min={0}
+              onChange={(value) => state.updateDefaultLayerObject(template.type, value)}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function TemplatePanel() {
   const state = useAppStore()
   const template = state.objectTemplates.find((item) => item.type === state.selectedTemplateType) ?? state.objectTemplates[0]
@@ -720,6 +782,7 @@ function ConfigPanel() {
 function LeftPanel() {
   return (
     <aside className="side-panel left-panel">
+      <DefaultLayerPanel />
       <PoiPanel />
       <TemplatePanel />
       <ConfigPanel />
@@ -838,7 +901,11 @@ function StatsPanel({ result }: { result: ReturnType<typeof calculatePerformance
         <div className="section-title"><MousePointer2 size={17} /> POI 统计</div>
         <div className="stat-list compact">
           {result.byPoi.map((item) => (
-            <button key={item.poiId} onClick={() => state.selectPoi(item.poiId)} className={item.visible ? '' : 'muted'}>
+            <button
+              key={item.poiId}
+              onClick={() => state.selectPoi(item.poiId === state.defaultLayer.id ? null : item.poiId)}
+              className={item.visible ? '' : 'muted'}
+            >
               <span>{item.name}</span>
               <strong>{fmt(item.dp)} / {fmt(item.triangles)}</strong>
               <small>视锥重叠 {Math.round(item.overlapRatio * 100)}%</small>
@@ -898,6 +965,7 @@ function DataActions({ result }: { result: ReturnType<typeof calculatePerformanc
     schemaVersion: 1,
     metadata: { ...state.metadata, updatedAt: new Date().toISOString() },
     regionConfig: state.regionConfig,
+    defaultLayer: state.defaultLayer,
     platform: state.platform,
     qualityLevel: state.qualityLevel,
     qualityConfigs: state.qualityConfigs,

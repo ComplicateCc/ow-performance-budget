@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest'
 import {
+  calculateDefaultLayerOverlap,
   calculatePoiFrustumOverlap,
   calculatePerformance,
   getBudgetStatus,
@@ -136,6 +137,31 @@ describe('performance calculation', () => {
     expect(fullOverlap.overlapRatio).toBeGreaterThan(partialOverlap.overlapRatio)
     expect(partialOverlap.overlapRatio).toBeGreaterThan(0)
     expect(partialPerf.dp).toBeLessThan(fullPerf.dp)
+  })
+
+  it('keeps the default layer out of occupied POI regions', () => {
+    const state = createDefaultProject()
+    state.pois = [
+      {
+        id: 'full-cover',
+        name: 'Full Cover',
+        description: '',
+        level: 'XL',
+        x: 0,
+        y: 0,
+        width: state.regionConfig.width,
+        height: state.regionConfig.height,
+        cullingRate: 0,
+        objects: { meadow: 0, tree: 0, building: 0, prop: 0, effect: 0 },
+      },
+    ]
+
+    const overlap = calculateDefaultLayerOverlap(state, state.camera)
+    const defaultStat = calculatePerformance(state).byPoi.find((poi) => poi.poiId === state.defaultLayer.id)!
+
+    expect(overlap.samples.length).toBe(0)
+    expect(defaultStat.dp).toBe(0)
+    expect(defaultStat.triangles).toBe(0)
   })
 })
 

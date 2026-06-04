@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { clamp, clampRegion } from './calc'
-import { createDefaultProject, emptyObjects, poiLevelMeta } from './data'
+import { createDefaultLayer, createDefaultProject, emptyObjects, poiLevelMeta } from './data'
 import type {
   CameraConfig,
   ObjectTemplate,
@@ -25,6 +25,7 @@ const snapshotOf = (state: ProjectState): Omit<ProjectState, 'versions'> => {
     schemaVersion: state.schemaVersion,
     metadata: state.metadata,
     regionConfig: state.regionConfig,
+    defaultLayer: state.defaultLayer,
     platform: state.platform,
     qualityLevel: state.qualityLevel,
     qualityConfigs: state.qualityConfigs,
@@ -49,6 +50,7 @@ interface AppStore extends ProjectState {
   setPlatform: (platform: Platform) => void
   setQualityLevel: (qualityLevel: number) => void
   updateCamera: (patch: Partial<CameraConfig>) => void
+  updateDefaultLayer: (patch: Partial<PoiRegion>) => void
   selectPoi: (id: string | null) => void
   createPoi: (x: number, y: number, level?: PoiLevel) => void
   updatePoi: (id: string, patch: Partial<PoiRegion>) => void
@@ -56,6 +58,7 @@ interface AppStore extends ProjectState {
   duplicatePoi: (id: string) => void
   copyPoi: (id: string) => void
   pastePoi: () => void
+  updateDefaultLayerObject: (type: ObjectType, count: number) => void
   updatePoiObject: (poiId: string, type: ObjectType, count: number) => void
   createTemplate: () => void
   updateTemplate: (template: ObjectTemplate) => void
@@ -89,6 +92,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({
       ...project,
       platform: 'mobile',
+      defaultLayer: {
+        ...createDefaultLayer(project.regionConfig),
+        ...project.defaultLayer,
+        objects: { ...templateObjects(project.objectTemplates), ...(project.defaultLayer?.objects ?? {}) },
+        x: 0,
+        y: 0,
+        width: project.regionConfig.width,
+        height: project.regionConfig.height,
+      },
       pois: withTemplateObjectKeys(project.pois, project.objectTemplates),
       selectedPoiId: project.pois[0]?.id ?? null,
       copiedPoi: null,
@@ -99,6 +111,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const region = clampRegion({ ...state.regionConfig, ...patch })
       return {
         regionConfig: region,
+        defaultLayer: {
+          ...state.defaultLayer,
+          x: 0,
+          y: 0,
+          width: region.width,
+          height: region.height,
+        },
         camera: {
           ...state.camera,
           x: clamp(state.camera.x, 0, region.width),
@@ -121,6 +140,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
         x: clamp(patch.x ?? state.camera.x, 0, state.regionConfig.width),
         y: clamp(patch.y ?? state.camera.y, 0, state.regionConfig.height),
         fov: clamp(patch.fov ?? state.camera.fov, 1, 170),
+      },
+    })),
+  updateDefaultLayer: (patch) =>
+    set((state) => ({
+      defaultLayer: {
+        ...state.defaultLayer,
+        ...patch,
+        id: state.defaultLayer.id,
+        x: 0,
+        y: 0,
+        width: state.regionConfig.width,
+        height: state.regionConfig.height,
+        cullingRate: clamp(patch.cullingRate ?? state.defaultLayer.cullingRate, 0, 100),
       },
     })),
   selectPoi: (id) => set({ selectedPoiId: id }),
@@ -193,6 +225,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     set((state) => ({ pois: [...state.pois, poi], selectedPoiId: poi.id }))
   },
+  updateDefaultLayerObject: (type, count) =>
+    set((state) => ({
+      defaultLayer: {
+        ...state.defaultLayer,
+        objects: { ...state.defaultLayer.objects, [type]: Math.max(0, Math.round(count)) },
+      },
+    })),
   updatePoiObject: (poiId, type, count) =>
     set((state) => ({
       pois: state.pois.map((poi) =>
@@ -222,6 +261,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       return {
         objectTemplates: [...state.objectTemplates, template],
+        defaultLayer: { ...state.defaultLayer, objects: { ...state.defaultLayer.objects, [type]: 0 } },
         pois: state.pois.map((poi) => ({ ...poi, objects: { ...poi.objects, [type]: 0 } })),
         selectedTemplateType: type,
       }
@@ -255,6 +295,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   importTemplates: (objectTemplates) =>
     set((state) => ({
       objectTemplates,
+      defaultLayer: { ...state.defaultLayer, objects: { ...templateObjects(objectTemplates), ...state.defaultLayer.objects } },
       pois: withTemplateObjectKeys(state.pois, objectTemplates),
       selectedTemplateType: objectTemplates[0]?.type ?? state.selectedTemplateType,
     })),

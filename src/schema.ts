@@ -80,6 +80,7 @@ const snapshotSchema = z.object({
   schemaVersion: z.literal(1),
   metadata: z.object({ name: z.string(), updatedAt: z.string() }),
   regionConfig: regionSchema,
+  defaultLayer: poiSchema.optional(),
   platform: z.enum(['pc', 'console', 'mobile']),
   qualityLevel: z.number().int().min(0).max(5),
   qualityConfigs: qualityConfigsSchema,

@@ -218,6 +218,18 @@ button.active,
   border-color: #22c55e;
 }
 
+.top-actions button.active,
+.map-toolbar button.active {
+  color: #f8fafc;
+  background: rgba(34, 197, 94, 0.24);
+  border-color: #22c55e;
+}
+
+.top-actions button.active svg,
+.map-toolbar button.active svg {
+  color: #bbf7d0;
+}
+
 button.danger {
   color: #fecaca;
   border-color: #7f1d1d;
@@ -287,6 +299,28 @@ button.danger {
   border-top: 1px solid #1e293b;
   display: grid;
   gap: 9px;
+}
+
+.compact-editor {
+  margin-top: 10px;
+}
+
+.default-layer-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 6px;
+  color: #bae6fd;
+  background: rgba(56, 189, 248, 0.08);
+  font-size: 12px;
+}
+
+.default-layer-summary strong {
+  color: #f8fafc;
+  font-family: 'Fira Code', monospace;
 }
 
 .title-input {

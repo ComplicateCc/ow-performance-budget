@@ -1,4 +1,5 @@
 import { toPng } from 'html-to-image'
+import { createDefaultLayer } from './data'
 import { qualityConfigSchema, templateListSchema, projectSchema } from './schema'
 import type { ProjectState, QualityConfigs, ObjectTemplate, PerformanceResult } from './types'
 
@@ -17,7 +18,13 @@ export const downloadJson = (filename: string, data: unknown) =>
 
 export const readJsonFile = async (file: File) => JSON.parse(await file.text()) as unknown
 
-export const parseProject = (data: unknown): ProjectState => projectSchema.parse(data) as ProjectState
+export const parseProject = (data: unknown): ProjectState => {
+  const parsed = projectSchema.parse(data) as ProjectState
+  return {
+    ...parsed,
+    defaultLayer: parsed.defaultLayer ?? createDefaultLayer(parsed.regionConfig),
+  }
+}
 
 export const parseTemplates = (data: unknown): ObjectTemplate[] => templateListSchema.parse(data) as ObjectTemplate[]
 

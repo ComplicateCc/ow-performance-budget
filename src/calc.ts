@@ -80,6 +80,24 @@ const buildPoiSamples = (poi: PoiRegion, targetSamples = 64) => {
   return samples
 }
 
+const buildRegionSamples = (region: RegionConfig, targetSamples = 256) => {
+  const columns = Math.max(4, Math.round(Math.sqrt(targetSamples * (region.width / Math.max(1, region.height)))))
+  const rows = Math.max(4, Math.round(targetSamples / columns))
+  const samples: { x: number; y: number }[] = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      samples.push({
+        x: ((column + 0.5) / columns) * region.width,
+        y: ((row + 0.5) / rows) * region.height,
+      })
+    }
+  }
+  return samples
+}
+
+const isPointInPoi = (point: { x: number; y: number }, poi: PoiRegion) =>
+  point.x >= poi.x && point.x <= poi.x + poi.width && point.y >= poi.y && point.y <= poi.y + poi.height
+
 export const calculatePoiFrustumOverlap = (poi: PoiRegion, camera: CameraConfig) => {
   const samples = buildPoiSamples(poi)
   const visibleSamples = samples.filter((sample) => isPointInCamera(sample, camera))
@@ -109,10 +127,11 @@ export const calculatePoiContribution = (
   quality: QualityLevel,
   camera: CameraConfig,
   globalCullingFactor: number,
+  sampleInput?: { samples: { x: number; y: number }[]; visibleSamples: { x: number; y: number }[] },
 ) => {
   const culling = clamp((poi.cullingRate / 100) * globalCullingFactor, 0, 1)
   const result: CategoryStat[] = []
-  const { samples, visibleSamples } = calculatePoiFrustumOverlap(poi, camera)
+  const { samples, visibleSamples } = sampleInput ?? calculatePoiFrustumOverlap(poi, camera)
   if (visibleSamples.length === 0) return result
 
   ;(Object.keys(poi.objects) as ObjectType[]).forEach((type) => {
@@ -139,6 +158,17 @@ export const calculatePoiContribution = (
   return result
 }
 
+export const calculateDefaultLayerOverlap = (state: ProjectState, camera: CameraConfig) => {
+  const regionSamples = buildRegionSamples(state.regionConfig)
+  const samples = regionSamples.filter((sample) => !state.pois.some((poi) => isPointInPoi(sample, poi)))
+  const visibleSamples = samples.filter((sample) => isPointInCamera(sample, camera))
+  return {
+    samples,
+    visibleSamples,
+    overlapRatio: samples.length > 0 ? visibleSamples.length / samples.length : 0,
+  }
+}
+
 export const getBudgetStatus = (dpRatio: number, triangleRatio: number) => {
   const ratio = Math.max(dpRatio, triangleRatio)
   if (ratio > 0.85) return 'critical'
@@ -155,6 +185,46 @@ export const calculatePerformance = (state: ProjectState): PerformanceResult => 
   const byType = new Map<ObjectType, CategoryStat>()
   const byPoi: PoiStat[] = []
   const visiblePoiIds: string[] = []
+
+  const defaultLayer = {
+    ...state.defaultLayer,
+    x: 0,
+    y: 0,
+    width: state.regionConfig.width,
+    height: state.regionConfig.height,
+  }
+  const defaultOverlap = calculateDefaultLayerOverlap(state, camera)
+  if (defaultOverlap.overlapRatio > 0) {
+    const stats = calculatePoiContribution(
+      defaultLayer,
+      state.objectTemplates,
+      quality,
+      camera,
+      state.regionConfig.globalCullingFactor,
+      defaultOverlap,
+    )
+    const layerDp = stats.reduce((sum, item) => sum + item.dp, 0)
+    const layerTriangles = stats.reduce((sum, item) => sum + item.triangles, 0)
+    byPoi.push({
+      poiId: defaultLayer.id,
+      name: defaultLayer.name,
+      dp: layerDp,
+      triangles: layerTriangles,
+      visible: true,
+      overlapRatio: defaultOverlap.overlapRatio,
+    })
+    stats.forEach((item) => {
+      const prev = byType.get(item.type) ?? { type: item.type, dp: 0, triangles: 0, count: 0 }
+      byType.set(item.type, {
+        type: item.type,
+        dp: prev.dp + item.dp,
+        triangles: prev.triangles + item.triangles,
+        count: prev.count + item.count,
+      })
+    })
+  } else {
+    byPoi.push({ poiId: defaultLayer.id, name: defaultLayer.name, dp: 0, triangles: 0, visible: false, overlapRatio: 0 })
+  }
 
   state.pois.forEach((poi) => {
     const visible = isPoiVisible(poi, camera)

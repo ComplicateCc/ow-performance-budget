@@ -125,6 +125,19 @@ export const defaultRegion: RegionConfig = {
   globalCullingFactor: 1,
 }
 
+export const createDefaultLayer = (region = defaultRegion): PoiRegion => ({
+  id: 'default-layer',
+  name: '默认层',
+  description: '覆盖非 POI 区域的基础环境负载',
+  level: 'L',
+  x: 0,
+  y: 0,
+  width: region.width,
+  height: region.height,
+  cullingRate: 50,
+  objects: { meadow: 420, tree: 90, building: 0, prop: 80, effect: 1 },
+})
+
 export const defaultCamera: CameraConfig = {
   x: 500,
   y: 720,
@@ -244,6 +257,7 @@ export const createDefaultProject = (): ProjectState => ({
     updatedAt: new Date().toISOString(),
   },
   regionConfig: defaultRegion,
+  defaultLayer: createDefaultLayer(defaultRegion),
   platform: 'mobile',
   qualityLevel: 3,
   qualityConfigs: defaultQualityConfigs,

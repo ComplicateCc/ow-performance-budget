@@ -117,6 +117,7 @@ export interface ProjectState {
     updatedAt: string
   }
   regionConfig: RegionConfig
+  defaultLayer: PoiRegion
   platform: Platform
   qualityLevel: number
   qualityConfigs: QualityConfigs
